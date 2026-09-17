@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab 1: In-Memory Preload vs Database Query - Duolingo Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .animate-pulse-fast { animation: pulse-fast 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center py-10 px-4">
+
+    <div class="max-w-4xl w-full">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-1.5 rounded-full text-sm font-semibold mb-3">
+                <i class="fa-solid fa-bolt"></i> Lab 1: Zero Database Query At Peak
+            </div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                Mô Phỏng Kiến Trúc Con Chim Xanh Duolingo
+            </h1>
+            <p class="text-slate-400 mt-2 text-sm sm:text-base max-w-2xl mx-auto">
+                Tại sao tại thời điểm phát sóng 5 giây, Duolingo <span class="text-emerald-400 font-semibold">tuyệt đối không chạm vào Database</span>? 
+                Hãy tự mình kiểm chứng ngay bên dưới!
+            </p>
+        </div>
+
+        <!-- Dashboard Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- Step 1: Seed Data -->
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
+                        <span>Bước 1</span>
+                        <i class="fa-solid fa-database text-blue-400"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-1">Sinh 100,000 Records</h3>
+                    <p class="text-xs text-slate-400 mb-4">Chèn dữ liệu mẫu vào PostgreSQL bằng JDBC Batch (chỉ tốn ~2-3s).</p>
+                </div>
+                <div>
+                    <div id="db-status" class="text-xs font-mono text-slate-300 bg-slate-900/60 p-2 rounded mb-3">
+                        DB: Đang kiểm tra...
+                    </div>
+                    <button onclick="seedData()" id="btn-seed" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> Sinh dữ liệu mẫu
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Pre-warm Memory -->
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
+                        <span>Bước 2</span>
+                        <i class="fa-solid fa-memory text-purple-400"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-1">Pre-warm vào RAM</h3>
+                    <p class="text-xs text-slate-400 mb-4">Mô phỏng 20 Interim Workers nạp sẵn User -> Device Token vào RAM trước giờ G.</p>
+                </div>
+                <div>
+                    <div id="ram-status" class="text-xs font-mono text-slate-300 bg-slate-900/60 p-2 rounded mb-3">
+                        RAM: 0 records (Chưa nạp)
+                    </div>
+                    <button onclick="prewarmMemory()" id="btn-prewarm" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-bolt"></i> Nạp vào RAM
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Trigger & Benchmark -->
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
+                        <span>Bước 3</span>
+                        <i class="fa-solid fa-stopwatch text-emerald-400"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-1">Chạy So Sánh</h3>
+                    <p class="text-xs text-slate-400 mb-4">Giả lập "Bấm nút đỏ" kích hoạt gửi push notification theo 2 cách.</p>
+                </div>
+                <div>
+                    <div class="text-xs font-mono text-slate-300 bg-slate-900/60 p-2 rounded mb-3">
+                        So sánh JPA vs In-Memory
+                    </div>
+                    <button onclick="runBenchmark()" id="btn-benchmark" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-fire"></i> Chạy Benchmark
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <div id="result-box" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-2xl transition-all">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-4 mb-5">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-chart-column text-emerald-400"></i> Kết quả đo đạc thực tế
+                </h2>
+                <span id="speedup-badge" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-sm font-bold px-3 py-1 rounded-full">
+                    -
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Naive DB Result -->
+                <div class="bg-slate-900/80 border border-rose-500/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between text-rose-400 font-semibold mb-2">
+                        <span>1. Naive DB Query (JPA)</span>
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-white mb-1" id="db-time">-- ms</div>
+                    <div class="text-xs text-slate-400 mb-3" id="db-throughput">Throughput: -- ops/s</div>
+                    <p class="text-xs text-rose-300/80 bg-rose-500/10 p-2.5 rounded border border-rose-500/20" id="db-bottleneck">
+                        Nghẽn tại Database Network I/O, Disk I/O và Hibernate Dirty Checking overhead.
+                    </p>
+                </div>
+
+                <!-- Duolingo In-Memory Result -->
+                <div class="bg-slate-900/80 border border-emerald-500/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between text-emerald-400 font-semibold mb-2">
+                        <span>2. Duolingo In-Memory Preload</span>
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-emerald-400 mb-1" id="ram-time">-- ms</div>
+                    <div class="text-xs text-slate-400 mb-3" id="ram-throughput">Throughput: -- ops/s</div>
+                    <p class="text-xs text-emerald-300/80 bg-emerald-500/10 p-2.5 rounded border border-emerald-500/20" id="ram-bottleneck">
+                        Không tốn I/O Database hay Disk. Dữ liệu đọc trực tiếp trên RAM và CPU Cache.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Conclusion Alert -->
+            <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg flex items-start gap-3">
+                <i class="fa-solid fa-lightbulb text-blue-400 text-lg mt-0.5"></i>
+                <div class="text-sm text-blue-200" id="conclusion-text">
+                    Đang tính toán kết luận...
+                </div>
+            </div>
+        </div>
+
+        <!-- DAY 2 EXPERIMENT: MEMORY ANATOMY -->
+        <div class="mt-6 bg-slate-800/90 border border-amber-500/30 rounded-xl p-6 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold px-2.5 py-1 rounded">NGÀY 2</span>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-amber-400"></i> Mổ Xẻ Bộ Nhớ Heap: JPA vs JDBC
+                    </h3>
+                </div>
+                <span class="text-xs text-slate-400">First-Level Cache & Dirty Checking</span>
+            </div>
+
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                Khi gọi <code class="bg-slate-900 px-1 py-0.5 rounded text-rose-400 font-mono">findAll()</code>, Hibernate tạo hơn 700k Java Objects và nhân đôi bộ nhớ để làm Dirty Checking. 
+                Hãy bấm thử 2 nút dưới để xem <strong>lượng RAM thực tế bị ngốn</strong>:
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div class="bg-slate-900/90 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold text-rose-400 mb-1">
+                            <span>1. JPA findAll() (Managed Entity)</span>
+                            <i class="fa-solid fa-fire text-rose-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mb-3">Load 100k dòng qua Hibernate, giữ trong Persistence Context.</p>
+                        <div id="exp-jpa-res" class="text-xs font-mono text-slate-300 bg-slate-800 p-2 rounded mb-3">
+                            Chưa chạy
+                        </div>
+                    </div>
+                    <button onclick="runJpaExperiment()" id="btn-exp-jpa" class="w-full bg-rose-700 hover:bg-rose-600 text-white font-semibold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-chart-pie"></i> Đo RAM JPA findAll()
+                    </button>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold text-emerald-400 mb-1">
+                            <span>2. JDBC + Java 17 Record (Zero Hibernate)</span>
+                            <i class="fa-solid fa-feather text-emerald-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mb-3">Đọc raw JDBC trực tiếp vào Plain Record, bỏ qua Hibernate hoàn toàn.</p>
+                        <div id="exp-jdbc-res" class="text-xs font-mono text-slate-300 bg-slate-800 p-2 rounded mb-3">
+                            Chưa chạy
+                        </div>
+                    </div>
+                    <button onclick="runJdbcExperiment()" id="btn-exp-jdbc" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-semibold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-feather-pointed"></i> Đo RAM JDBC Record
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAY 3 EXPERIMENT: BATCH INSERT -->
+        <div class="mt-6 bg-slate-800/90 border border-sky-500/30 rounded-xl p-6 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="bg-sky-500/20 text-sky-300 border border-sky-500/40 text-xs font-bold px-2.5 py-1 rounded">NGÀY 3</span>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-sky-400"></i> Bản Chất Batching: JPA saveAll() vs JDBC batchUpdate()
+                    </h3>
+                </div>
+                <span class="text-xs text-slate-400">Network Round-Trips & IDENTITY Trap</span>
+            </div>
+
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                Thử chèn <strong>2,000 bản ghi</strong>: <code class="bg-slate-900 px-1 py-0.5 rounded text-rose-400 font-mono">saveAll()</code> phải gửi 2,000 requests riêng rẽ vì <code class="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">IDENTITY</code> vô hiệu hóa batching! 
+                Trong khi <code class="bg-slate-900 px-1 py-0.5 rounded text-emerald-400 font-mono">batchUpdate()</code> đóng gói toàn bộ vào 1 gói tin TCP duy nhất.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
+                <div class="bg-slate-900/90 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold text-rose-400 mb-1">
+                            <span>1. JPA saveAll() (2,000 dòng)</span>
+                            <i class="fa-solid fa-hourglass-half text-rose-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mb-3">Gọi save() từng dòng, chờ DB sinh ID rồi mới chèn dòng tiếp theo.</p>
+                        <div id="exp-batch-jpa-res" class="text-xs font-mono text-slate-300 bg-slate-800 p-2 rounded mb-3">
+                            Chưa chạy
+                        </div>
+                    </div>
+                    <button onclick="runBatchJpaExperiment()" id="btn-batch-jpa" class="w-full bg-rose-700 hover:bg-rose-600 text-white font-semibold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> Chèn 2k dòng bằng saveAll()
+                    </button>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold text-emerald-400 mb-1">
+                            <span>2. JDBC batchUpdate() (2,000 dòng)</span>
+                            <i class="fa-solid fa-bolt text-emerald-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mb-3">Gom 2,000 dòng vào 1 packet mạng, gửi 1 lần duy nhất sang DB.</p>
+                        <div id="exp-batch-jdbc-res" class="text-xs font-mono text-slate-300 bg-slate-800 p-2 rounded mb-3">
+                            Chưa chạy
+                        </div>
+                    </div>
+                    <button onclick="runBatchJdbcExperiment()" id="btn-batch-jdbc" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-semibold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-bolt-lightning"></i> Chèn 2k dòng bằng batchUpdate()
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-6 bg-black/50 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-400">
+            <div class="text-slate-500 font-semibold mb-2 flex items-center justify-between">
+                <span><i class="fa-solid fa-terminal mr-1"></i> System Activity Log</span>
+                <span id="log-time" class="text-[10px]"></span>
+            </div>
+            <div id="console-log" class="space-y-1 max-h-36 overflow-y-auto">
+                <div class="text-slate-500">> Hệ thống đã sẵn sàng. Hãy bấm kiểm tra trạng thái hoặc sinh dữ liệu.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(msg, type = 'info') {
+            const consoleBox = document.getElementById('console-log');
+            const time = new Date().toLocaleTimeString();
+            let color = 'text-slate-300';
+            if (type === 'success') color = 'text-emerald-400';
+            if (type === 'error') color = 'text-rose-400';
+            if (type === 'warning') color = 'text-amber-400';
+
+            const line = document.createElement('div');
+            line.className = color;
+            line.innerHTML = `> [${time}] ${msg}`;
+            consoleBox.appendChild(line);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/lab1/status');
+                const data = await res.json();
+                document.getElementById('db-status').innerText = `DB: ${data.totalRecordsInDatabase.toLocaleString()} records`;
+                document.getElementById('ram-status').innerText = `RAM: ${data.totalRecordsInMemory.toLocaleString()} records (${data.isPreloaded ? 'Đã nạp' : 'Chưa nạp'})`;
+                return data;
+            } catch (e) {
+                document.getElementById('db-status').innerText = 'DB: Lỗi kết nối';
+                log('Không thể kết nối đến Backend: ' + e.message, 'error');
+            }
+        }
+
+        async function seedData() {
+            const btn = document.getElementById('btn-seed');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang sinh 100k records...';
+            log('Bắt đầu chèn 100,000 bản ghi bằng JDBC Batch...');
+
+            try {
+                const res = await fetch('/api/lab1/seed?count=100000', { method: 'POST' });
+                const data = await res.json();
+                log(`Đã chèn thành công ${data.totalRecords.toLocaleString()} dòng trong ${data.seedingTimeMs} ms!`, 'success');
+                await fetchStatus();
+            } catch (e) {
+                log('Lỗi khi sinh dữ liệu: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> Sinh dữ liệu mẫu';
+            }
+        }
+
+        async function prewarmMemory() {
+            const btn = document.getElementById('btn-prewarm');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nạp vào RAM...';
+            log('Pre-warm: Đang kéo dữ liệu từ DB vào RAM của Interim Worker...');
+
+            try {
+                const res = await fetch('/api/lab1/prewarm', { method: 'POST' });
+                const data = await res.json();
+                log(`Đã nạp ${data.count.toLocaleString()} records vào RAM trong ${data.durationMs} ms (tiêu tốn ~${data.memoryUsedMB.toFixed(2)} MB RAM)!`, 'success');
+                await fetchStatus();
+            } catch (e) {
+                log('Lỗi khi pre-warm RAM: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Nạp vào RAM';
+            }
+        }
+
+        async function runBenchmark() {
+            const btn = document.getElementById('btn-benchmark');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang benchmark...';
+            log('Bắt đầu chạy benchmark so sánh Naive DB Query vs Duolingo In-Memory...');
+
+            try {
+                const res = await fetch('/api/lab1/benchmark');
+                const data = await res.json();
+
+                document.getElementById('result-box').classList.remove('hidden');
+                document.getElementById('speedup-badge').innerText = `⚡ ${data.speedupRatio}`;
+                
+                document.getElementById('db-time').innerText = `${data.naiveDbApproach.durationMs} ms`;
+                document.getElementById('db-throughput').innerText = `Throughput: ${data.naiveDbApproach.throughputPerSecond.toLocaleString()} ops/s`;
+                document.getElementById('db-bottleneck').innerText = data.naiveDbApproach.bottleneckExplanation;
+
+                document.getElementById('ram-time').innerText = `${data.inMemoryApproach.durationMs} ms`;
+                document.getElementById('ram-throughput').innerText = `Throughput: ${data.inMemoryApproach.throughputPerSecond.toLocaleString()} ops/s`;
+                document.getElementById('ram-bottleneck').innerText = data.inMemoryApproach.bottleneckExplanation;
+
+                document.getElementById('conclusion-text').innerText = data.conclusion;
+
+                log(`Benchmark hoàn tất! In-Memory nhanh hơn ${data.speedupRatio}!`, 'success');
+            } catch (e) {
+                log('Lỗi khi benchmark: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-fire"></i> Chạy Benchmark';
+            }
+        }
+
+        async function runJpaExperiment() {
+            const btn = document.getElementById('btn-exp-jpa');
+            const resBox = document.getElementById('exp-jpa-res');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đo...';
+            log('[Ngày 2] Đang gọi JPA findAll() 100k dòng để đo Heap RAM...');
+
+            try {
+                const res = await fetch('/api/lab1/experiment/jpa-memory');
+                const data = await res.json();
+                resBox.innerHTML = `<span class="text-rose-400 font-bold">${data.memoryConsumedMB}</span> trong <span class="text-white">${data.timeMs} ms</span>`;
+                log(`[JPA findAll] Ngốn ${data.memoryConsumedMB} RAM, mất ${data.timeMs} ms!`, 'warning');
+            } catch (e) {
+                resBox.innerText = 'Lỗi hoặc OOM!';
+                log('Lỗi đo JPA: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-chart-pie"></i> Đo RAM JPA findAll()';
+            }
+        }
+
+        async function runJdbcExperiment() {
+            const btn = document.getElementById('btn-exp-jdbc');
+            const resBox = document.getElementById('exp-jdbc-res');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đo...';
+            log('[Ngày 2] Đang gọi JDBC + Java 17 Record 100k dòng để đo Heap RAM...');
+
+            try {
+                const res = await fetch('/api/lab1/experiment/jdbc-memory');
+                const data = await res.json();
+                resBox.innerHTML = `<span class="text-emerald-400 font-bold">${data.memoryConsumedMB}</span> trong <span class="text-white">${data.timeMs} ms</span>`;
+                log(`[JDBC Record] Chỉ ngốn ${data.memoryConsumedMB} RAM, mất ${data.timeMs} ms!`, 'success');
+            } catch (e) {
+                resBox.innerText = 'Lỗi đo JDBC!';
+                log('Lỗi đo JDBC: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-feather-pointed"></i> Đo RAM JDBC Record';
+            }
+        }
+
+        async function runBatchJpaExperiment() {
+            const btn = document.getElementById('btn-batch-jpa');
+            const resBox = document.getElementById('exp-batch-jpa-res');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chèn...';
+            log('[Ngày 3] Đang gọi JPA saveAll() chèn 2,000 bản ghi đơn lẻ...');
+
+            try {
+                const res = await fetch('/api/lab1/experiment/batch-jpa?count=2000', { method: 'POST' });
+                const data = await res.json();
+                resBox.innerHTML = `<span class="text-rose-400 font-bold">${data.durationMs} ms</span> (~${data.opsPerSec.toLocaleString()} ops/s)`;
+                log(`[JPA saveAll] Chèn 2,000 dòng mất ${data.durationMs} ms!`, 'warning');
+                await fetchStatus();
+            } catch (e) {
+                resBox.innerText = 'Lỗi chèn JPA!';
+                log('Lỗi JPA: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> Chèn 2k dòng bằng saveAll()';
+            }
+        }
+
+        async function runBatchJdbcExperiment() {
+            const btn = document.getElementById('btn-batch-jdbc');
+            const resBox = document.getElementById('exp-batch-jdbc-res');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chèn...';
+            log('[Ngày 3] Đang gọi JDBC batchUpdate() chèn 2,000 bản ghi trong 1 gói tin...');
+
+            try {
+                const res = await fetch('/api/lab1/experiment/batch-jdbc?count=2000', { method: 'POST' });
+                const data = await res.json();
+                resBox.innerHTML = `<span class="text-emerald-400 font-bold">${data.durationMs} ms</span> (~${data.opsPerSec.toLocaleString()} ops/s)`;
+                log(`[JDBC batchUpdate] Chèn 2,000 dòng chỉ mất ${data.durationMs} ms!`, 'success');
+                await fetchStatus();
+            } catch (e) {
+                resBox.innerText = 'Lỗi chèn JDBC!';
+                log('Lỗi JDBC: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt-lightning"></i> Chèn 2k dòng bằng batchUpdate()';
+            }
+        }
+
+        // Tự động kiểm tra trạng thái khi tải trang
+        fetchStatus();
+    </script>
+</body>
+</html>
