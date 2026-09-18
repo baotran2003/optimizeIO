@@ -1,4 +1,4 @@
-package com.example.optimizeIO.lab1.service;
+package com.example.optimizeIO.lab1.service.day1;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

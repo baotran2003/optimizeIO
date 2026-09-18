@@ -1,67 +1,26 @@
 package com.example.optimizeIO.lab1.controller;
 
 import com.example.optimizeIO.lab1.dto.BenchmarkResponse;
-import com.example.optimizeIO.lab1.service.DataSeederService;
-import com.example.optimizeIO.lab1.service.InMemoryPreloadService;
-import com.example.optimizeIO.lab1.service.InMemoryPreloadService.PreloadStats;
-import com.example.optimizeIO.lab1.service.Lab1NotificationService;
+import com.example.optimizeIO.lab1.service.day1.DataSeederService;
+import com.example.optimizeIO.lab1.service.day1.InMemoryPreloadService;
+import com.example.optimizeIO.lab1.service.day1.InMemoryPreloadService.PreloadStats;
+import com.example.optimizeIO.lab1.service.day1.Lab1NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Slf4j
 @RestController
-@RequestMapping("/api/lab1")
+@RequestMapping({"/api/lab1/day1", "/api/lab1"})
 @RequiredArgsConstructor
-public class Lab1Controller {
+public class Day1Controller {
 
     private final DataSeederService dataSeederService;
     private final InMemoryPreloadService inMemoryPreloadService;
     private final Lab1NotificationService notificationService;
-    private final com.example.optimizeIO.lab1.service.JpaMemoryExperimentService jpaMemoryExperimentService;
-    private final com.example.optimizeIO.lab1.service.BatchInsertExperimentService batchInsertExperimentService;
-    private final com.example.optimizeIO.lab1.service.Day4DataStructureExperimentService day4DataStructureExperimentService;
-
-    /**
-     * Day 4 Experiment: So sánh dung lượng RAM giữa ArrayList vs HashMap vs ConcurrentHashMap
-     */
-    @GetMapping("/experiment/day4-datastructures")
-    public ResponseEntity<?> testDay4DataStructures() {
-        return ResponseEntity.ok(day4DataStructureExperimentService.compareDataStructures());
-    }
-
-    /**
-     * Day 2 Experiment: Đo lượng RAM và thời gian của JPA findAll()
-     */
-    @GetMapping("/experiment/jpa-memory")
-    public ResponseEntity<?> testJpaMemory() {
-        return ResponseEntity.ok(jpaMemoryExperimentService.measureJpaMemoryConsumption());
-    }
-
-    /**
-     * Day 2 Experiment: Đo lượng RAM và thời gian của JDBC Record
-     */
-    @GetMapping("/experiment/jdbc-memory")
-    public ResponseEntity<?> testJdbcMemory() {
-        return ResponseEntity.ok(jpaMemoryExperimentService.measureJdbcRecordMemoryConsumption());
-    }
-
-    /**
-     * Day 3 Experiment: Chèn 2,000 bản ghi bằng JPA saveAll()
-     */
-    @PostMapping("/experiment/batch-jpa")
-    public ResponseEntity<?> testBatchJpa(@RequestParam(defaultValue = "2000") int count) {
-        return ResponseEntity.ok(batchInsertExperimentService.testJpaSaveAll(count));
-    }
-
-    /**
-     * Day 3 Experiment: Chèn 2,000 bản ghi bằng JDBC batchUpdate()
-     */
-    @PostMapping("/experiment/batch-jdbc")
-    public ResponseEntity<?> testBatchJdbc(@RequestParam(defaultValue = "2000") int count) {
-        return ResponseEntity.ok(batchInsertExperimentService.testJdbcBatch(count));
-    }
 
     /**
      * 1. Sinh dữ liệu mẫu vào PostgreSQL.

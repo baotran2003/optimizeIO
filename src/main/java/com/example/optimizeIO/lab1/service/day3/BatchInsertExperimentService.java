@@ -1,4 +1,4 @@
-package com.example.optimizeIO.lab1.service;
+package com.example.optimizeIO.lab1.service.day3;
 
 import com.example.optimizeIO.lab1.entity.UserDevice;
 import com.example.optimizeIO.lab1.repository.UserDeviceRepository;

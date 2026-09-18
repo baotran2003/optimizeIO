@@ -1,4 +1,4 @@
-package com.example.optimizeIO.lab1.service;
+package com.example.optimizeIO.lab1.service.day1;
 
 import com.example.optimizeIO.lab1.dto.BenchmarkResponse;
 import com.example.optimizeIO.lab1.dto.BenchmarkResponse.ExecutionDetail;
@@ -33,7 +33,6 @@ public class Lab1NotificationService {
         // 2. Giả lập chuẩn bị payload notification
         AtomicLong processedCount = new AtomicLong();
         for (UserDevice device : devices) {
-            // Giả lập đọc token và tạo payload gửi push
             String payload = "{\"to\":\"" + device.getDeviceToken() + "\",\"title\":\"Học đi bạn êi!\"}";
             if (!payload.isEmpty()) {
                 processedCount.incrementAndGet();

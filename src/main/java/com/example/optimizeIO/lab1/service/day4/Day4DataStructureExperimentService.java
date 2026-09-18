@@ -1,4 +1,4 @@
-package com.example.optimizeIO.lab1.service;
+package com.example.optimizeIO.lab1.service.day4;
 
 import com.example.optimizeIO.lab1.dto.DeviceCacheItem;
 import lombok.RequiredArgsConstructor;
