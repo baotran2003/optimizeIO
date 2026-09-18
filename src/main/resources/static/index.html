@@ -246,6 +246,50 @@
                 </div>
             </div>
         </div>
+
+        <!-- DAY 4 EXPERIMENT: DATA STRUCTURES & MEMORY FOOTPRINT -->
+        <div class="mt-6 bg-slate-800/90 border border-violet-500/30 rounded-xl p-6 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="bg-violet-500/20 text-violet-300 border border-violet-500/40 text-xs font-bold px-2.5 py-1 rounded">NGÀY 4</span>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-memory text-violet-400"></i> Giải Phẫu Bộ Nhớ JVM: ArrayList vs HashMap vs ConcurrentHashMap
+                    </h3>
+                </div>
+                <span class="text-xs text-slate-400">Object Header & Memory Layout</span>
+            </div>
+
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                Nạp 100,000 bản ghi vào RAM nên dùng cấu trúc gì? <code class="bg-slate-900 px-1 py-0.5 rounded text-violet-300 font-mono">ArrayList&lt;Record&gt;</code> tiết kiệm RAM nhất nhờ nạp mảng liền kề, trong khi <code class="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">HashMap</code> tốn thêm Node&lt;K,V&gt; và con trỏ. Bấm nút dưới để đo trực tiếp:
+            </p>
+
+            <button onclick="runDay4Experiment()" id="btn-day4" class="w-full bg-violet-700 hover:bg-violet-600 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition flex items-center justify-center gap-2 mb-4">
+                <i class="fa-solid fa-bolt"></i> So sánh 3 Cấu Trúc Dữ Liệu (100k records)
+            </button>
+
+            <div id="day4-results" class="hidden grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="bg-slate-900/90 p-3.5 rounded-lg border border-slate-700">
+                    <div class="text-xs font-bold text-violet-300 mb-1">1. ArrayList&lt;Record&gt;</div>
+                    <div class="text-xl font-extrabold text-white mb-1" id="d4-list-mem">-- MB</div>
+                    <div class="text-[11px] text-slate-400 mb-2">Build: <span id="d4-list-build">--</span> | Scan 100k: <span id="d4-list-scan" class="text-emerald-400 font-bold">--</span></div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Mảng liên tục, Cache-friendly nhất. CPU L1/L2 nạp sẵn qua Cache line.</p>
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-lg border border-slate-700">
+                    <div class="text-xs font-bold text-amber-300 mb-1">2. HashMap&lt;Long, String&gt;</div>
+                    <div class="text-xl font-extrabold text-white mb-1" id="d4-map-mem">-- MB</div>
+                    <div class="text-[11px] text-slate-400 mb-2">Build: <span id="d4-map-build">--</span> | Lookup: <span class="text-amber-300 font-bold">O(1)</span></div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Tốn thêm ~32 bytes cho mỗi đối tượng Node&lt;K,V&gt; và mảng bucket.</p>
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-lg border border-slate-700">
+                    <div class="text-xs font-bold text-sky-300 mb-1">3. ConcurrentHashMap</div>
+                    <div class="text-xl font-extrabold text-white mb-1" id="d4-cmap-mem">-- MB</div>
+                    <div class="text-[11px] text-slate-400 mb-2">Build: <span id="d4-cmap-build">--</span> | An toàn đa luồng</div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Thread-safe, cho phép nhiều worker đọc/ghi đồng thời mà không bị khóa toàn bộ.</p>
+                </div>
+            </div>
+        </div>
         <div class="mt-6 bg-black/50 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-400">
             <div class="text-slate-500 font-semibold mb-2 flex items-center justify-between">
                 <span><i class="fa-solid fa-terminal mr-1"></i> System Activity Log</span>
@@ -439,6 +483,45 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-bolt-lightning"></i> Chèn 2k dòng bằng batchUpdate()';
+            }
+        }
+
+        async function runDay4Experiment() {
+            const btn = document.getElementById('btn-day4');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đo 3 cấu trúc dữ liệu...';
+            log('[Ngày 4] Bắt đầu benchmark dung lượng RAM: ArrayList vs HashMap vs ConcurrentHashMap...');
+
+            try {
+                const res = await fetch('/api/lab1/experiment/day4-datastructures');
+                const data = await res.json();
+
+                if (data.error) {
+                    log(data.error, 'error');
+                    return;
+                }
+
+                document.getElementById('day4-results').classList.remove('hidden');
+
+                // 1. ArrayList
+                document.getElementById('d4-list-mem').innerText = data.arrayListRecord.memoryConsumedMB;
+                document.getElementById('d4-list-build').innerText = `${data.arrayListRecord.buildTimeMs}ms`;
+                document.getElementById('d4-list-scan').innerText = data.arrayListRecord.scanTimeMs;
+
+                // 2. HashMap
+                document.getElementById('d4-map-mem').innerText = data.hashMap.memoryConsumedMB;
+                document.getElementById('d4-map-build').innerText = `${data.hashMap.buildTimeMs}ms`;
+
+                // 3. ConcurrentHashMap
+                document.getElementById('d4-cmap-mem').innerText = data.concurrentHashMap.memoryConsumedMB;
+                document.getElementById('d4-cmap-build').innerText = `${data.concurrentHashMap.buildTimeMs}ms`;
+
+                log(`[Ngày 4] Hoàn tất! ArrayList ngốn ${data.arrayListRecord.memoryConsumedMB}, HashMap ngốn ${data.hashMap.memoryConsumedMB}`, 'success');
+            } catch (e) {
+                log('Lỗi chạy Day 4 benchmark: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> So sánh 3 Cấu Trúc Dữ Liệu (100k records)';
             }
         }
 

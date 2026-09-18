@@ -67,17 +67,18 @@ public class BatchInsertExperimentService {
         List<Object[]> batchArgs = new ArrayList<>(count);
         Timestamp now = Timestamp.from(Instant.now());
 
+        // chuan bi du lieu vao RAm
         for (int i = 1; i <= count; i++) {
             batchArgs.add(new Object[]{
                 8000000L + i,
-                "jdbc_token_" + UUID.randomUUID(),
+                "jdbc_token_" + UUID.randomUUID(),  //  token random + duy nhat
                 i % 2 == 0 ? "IOS" : "ANDROID",
                 now
             });
         }
 
         long start = System.currentTimeMillis();
-        // Gom toàn bộ vào 1 gói tin gửi sang DB
+        // Gom toàn bộ(ghep SQL + tung record) vào 1 gói tin gửi sang DB
         jdbcTemplate.batchUpdate(sql, batchArgs);
         long durationMs = System.currentTimeMillis() - start;
 

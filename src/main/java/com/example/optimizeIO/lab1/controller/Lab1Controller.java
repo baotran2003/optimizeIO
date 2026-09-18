@@ -21,6 +21,15 @@ public class Lab1Controller {
     private final Lab1NotificationService notificationService;
     private final com.example.optimizeIO.lab1.service.JpaMemoryExperimentService jpaMemoryExperimentService;
     private final com.example.optimizeIO.lab1.service.BatchInsertExperimentService batchInsertExperimentService;
+    private final com.example.optimizeIO.lab1.service.Day4DataStructureExperimentService day4DataStructureExperimentService;
+
+    /**
+     * Day 4 Experiment: So sánh dung lượng RAM giữa ArrayList vs HashMap vs ConcurrentHashMap
+     */
+    @GetMapping("/experiment/day4-datastructures")
+    public ResponseEntity<?> testDay4DataStructures() {
+        return ResponseEntity.ok(day4DataStructureExperimentService.compareDataStructures());
+    }
 
     /**
      * Day 2 Experiment: Đo lượng RAM và thời gian của JPA findAll()

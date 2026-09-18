@@ -31,7 +31,7 @@ public class DataSeederService {
 
         String sql = "INSERT INTO user_devices (user_id, device_token, os_type, created_at) VALUES (?, ?, ?, ?)";
         int batchSize = 2000;
-        List<Object[]> batchArgs = new ArrayList<>(batchSize);
+        List<Object[]> batchArgs = new ArrayList<>(batchSize);  // gom tam data truoc khi gui xuong DB
         Timestamp now = Timestamp.from(Instant.now());
 
         for (int i = 1; i <= count; i++) {
@@ -47,7 +47,7 @@ public class DataSeederService {
             }
         }
 
-        if (!batchArgs.isEmpty()) {
+        if (batchArgs.isEmpty() == false) {
             jdbcTemplate.batchUpdate(sql, batchArgs);
             batchArgs.clear();
         }
