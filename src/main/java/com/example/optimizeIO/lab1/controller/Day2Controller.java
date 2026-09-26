@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping({"/api/lab1/day2", "/api/lab1"})
+@RequestMapping({"/api/lab1/day2"})
 @RequiredArgsConstructor
 public class Day2Controller {
 

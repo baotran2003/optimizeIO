@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class Day4DataStructureExperimentService {
+public class DataStructureExperimentService {
 
     private final JdbcTemplate jdbcTemplate;
 

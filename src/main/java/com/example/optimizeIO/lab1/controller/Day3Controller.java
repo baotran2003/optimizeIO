@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping({"/api/lab1/day3", "/api/lab1"})
+@RequestMapping({"/api/lab1/day3"})
 @RequiredArgsConstructor
 public class Day3Controller {
 

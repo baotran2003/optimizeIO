@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Mô phỏng Interim Worker của Duolingo:
@@ -25,38 +27,85 @@ public class InMemoryPreloadService {
     private List<DeviceCacheItem> inMemoryDevices = Collections.emptyList();
     private volatile boolean isPreloaded = false;
 
+    private final AtomicLong loadedCount = new AtomicLong(0);
+    private volatile long totalExpected = 0;
+    private volatile long preloadStartTime = 0;
+
+    private volatile String status = "NOT_STARTED";
+
     public synchronized PreloadStats preload() {
         log.info("Bắt đầu Pre-warm dữ liệu vào RAM...");
-        System.gc(); // Gợi ý dọn dẹp trước khi đo bộ nhớ
+
+        // TODO ④: Đếm tổng số bản ghi dự kiến từ DB trước (SELECT count(*) FROM user_devices)
+        Long count = jdbcTemplate.queryForObject("SELECT count(*) FROM user_devices", Long.class);
+        this.totalExpected = (count != null) ? count : 0;
+
+        // Reset lại các biến tracking
+        this.loadedCount.set(0);
+        this.preloadStartTime = System.currentTimeMillis();
+        this.status = "IN_PROGRESS";
+        this.isPreloaded = false;
+
+        System.gc();
+
         long memBefore = getUsedMemoryBytes();
-        long startTime = System.currentTimeMillis();
+        List<DeviceCacheItem> loadedList = new ArrayList<>((int) Math.min(this.totalExpected, 200_000));
 
-        List<DeviceCacheItem> loadedList = new ArrayList<>(120_000);
+        try {
+            // Đọc raw bằng JDBC để nạp vào RAM
+            jdbcTemplate.query(
+                    "SELECT user_id, device_token, os_type FROM user_devices",
+                    rs -> {
+                        loadedList.add(new DeviceCacheItem(
+                                rs.getLong("user_id"),
+                                rs.getString("device_token"),
+                                rs.getString("os_type")
+                        ));
 
-        // Đọc raw bằng JDBC để nạp nhanh nhất có thể vào RAM
-        jdbcTemplate.query(
-            "SELECT user_id, device_token, os_type FROM user_devices",
-            rs -> {
-                loadedList.add(new DeviceCacheItem(
-                    rs.getLong("user_id"),
-                    rs.getString("device_token"),
-                    rs.getString("os_type")
-                ));
-            }
-        );
+                        // TODO ⑤: Tăng bộ đếm loadedCount lên 1 cho mỗi dòng đọc được
+                        loadedCount.incrementAndGet();
+                    }
+            );
 
-        this.inMemoryDevices = Collections.unmodifiableList(loadedList);
-        this.isPreloaded = true;
+            this.inMemoryDevices = Collections.unmodifiableList(loadedList);
+            this.isPreloaded = true;
+            this.status = "COMPLETED";
 
-        long durationMs = System.currentTimeMillis() - startTime;
+        } catch (Exception e) {
+            this.status = "FAILED";
+            log.error("Prewarm thất bại: {}", e.getMessage());
+            throw e;
+        }
+
+        long durationMs = System.currentTimeMillis() - this.preloadStartTime;
         long memAfter = getUsedMemoryBytes();
         double memoryUsedMB = (memAfter - memBefore) / (1024.0 * 1024.0);
 
         log.info("Đã nạp {} bản ghi vào RAM trong {} ms, tiêu tốn ~{:.2f} MB RAM",
                 inMemoryDevices.size(), durationMs, memoryUsedMB);
-
         return new PreloadStats(inMemoryDevices.size(), durationMs, Math.max(0, memoryUsedMB));
     }
+
+    /**
+     * Hàm lấy tiến độ Pre-warm thời gian thực
+     */
+    public Map<String, Object> getPrewarmProgress() {
+        long currentLoaded = loadedCount.get();
+        long elapsedMs = (preloadStartTime > 0) ? (System.currentTimeMillis() - preloadStartTime) : 0;
+
+        // TODO ⑥: Tính % hoàn thành: (currentLoaded * 100.0) / totalExpected (nếu totalExpected > 0, ngược lại = 0.0)
+        // Làm tròn 1 chữ số thập phân (ví dụ 67.5)
+        double progressPercent = (currentLoaded * 100.0) / totalExpected;
+
+        return Map.of(
+                "status", status,
+                "progressPercent", Math.round(progressPercent * 10.0) / 10.0,
+                "loadedRecords", currentLoaded,
+                "totalExpected", totalExpected,
+                "elapsedMs", elapsedMs
+        );
+    }
+
 
     public List<DeviceCacheItem> getInMemoryDevices() {
         return inMemoryDevices;

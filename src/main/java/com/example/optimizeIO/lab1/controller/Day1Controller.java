@@ -4,7 +4,7 @@ import com.example.optimizeIO.lab1.dto.BenchmarkResponse;
 import com.example.optimizeIO.lab1.service.day1.DataSeederService;
 import com.example.optimizeIO.lab1.service.day1.InMemoryPreloadService;
 import com.example.optimizeIO.lab1.service.day1.InMemoryPreloadService.PreloadStats;
-import com.example.optimizeIO.lab1.service.day1.Lab1NotificationService;
+import com.example.optimizeIO.lab1.service.day1.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +14,13 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@RequestMapping({"/api/lab1/day1", "/api/lab1"})
+@RequestMapping({"/api/lab1/day1"})
 @RequiredArgsConstructor
 public class Day1Controller {
 
     private final DataSeederService dataSeederService;
     private final InMemoryPreloadService inMemoryPreloadService;
-    private final Lab1NotificationService notificationService;
+    private final NotificationService notificationService;
 
     /**
      * 1. Sinh dữ liệu mẫu vào PostgreSQL.
@@ -43,6 +43,17 @@ public class Day1Controller {
     public ResponseEntity<PreloadStats> prewarmMemory() {
         PreloadStats stats = inMemoryPreloadService.preload();
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * Bài 6.1 — Health Check tiến độ Pre-warm
+     * GET /api/lab1/day1/prewarm-status
+     */
+    @GetMapping("/prewarm-status")
+    public ResponseEntity<?> getPrewarmStatus() {
+        // TODO ⑦: Gọi hàm lấy tiến độ từ inMemoryPreloadService và return ResponseEntity.ok(...)
+        Map<String, Object> prewarmProgress = inMemoryPreloadService.getPrewarmProgress();
+        return ResponseEntity.ok(prewarmProgress);
     }
 
     /**

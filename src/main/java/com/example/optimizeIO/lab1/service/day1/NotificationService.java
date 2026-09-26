@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class Lab1NotificationService {
+public class NotificationService {
 
     private final UserDeviceRepository userDeviceRepository;
     private final InMemoryPreloadService inMemoryPreloadService;

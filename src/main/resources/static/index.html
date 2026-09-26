@@ -290,6 +290,73 @@
                 </div>
             </div>
         </div>
+
+        <!-- DAY 5 EXPERIMENT: HIKARICP CONNECTION POOL -->
+        <div class="mt-6 bg-slate-800/90 border border-orange-500/30 rounded-xl p-6 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs font-bold px-2.5 py-1 rounded">NGÀY 5</span>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-water-ladder text-orange-400"></i> Thắt Nút Cổ Chai Tại Connection Pool (HikariCP)
+                    </h3>
+                </div>
+                <span class="text-xs text-slate-400">Cascading Failure & Queue Latency</span>
+            </div>
+
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                HikariCP mặc định chỉ có <strong class="text-orange-400">10 connections</strong>. Khi có 15 requests đồng thời (mỗi query giữ connection 2 giây bằng <code class="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">pg_sleep(2)</code>), 10 requests đầu tiên chạy ngay, còn <strong>5 requests sau buộc phải xếp hàng chờ đợt 2 (~4,000ms)</strong>!
+            </p>
+
+            <!-- Real-time Pool Monitor -->
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-gauge-high text-orange-400"></i> Trạng Thái HikariCP Pool Thời Gian Thực
+                    </span>
+                    <button onclick="fetchPoolStatus()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-600 transition flex items-center gap-1">
+                        <i class="fa-solid fa-arrows-rotate"></i> Kiểm tra Pool
+                    </button>
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="bg-slate-800/80 p-2.5 rounded border border-slate-700">
+                        <div class="text-[11px] text-slate-400 mb-1">Active (Đang bận)</div>
+                        <div class="text-xl font-extrabold text-orange-400" id="d5-active-conn">--</div>
+                    </div>
+                    <div class="bg-slate-800/80 p-2.5 rounded border border-slate-700">
+                        <div class="text-[11px] text-slate-400 mb-1">Idle (Đang rảnh)</div>
+                        <div class="text-xl font-extrabold text-emerald-400" id="d5-idle-conn">--</div>
+                    </div>
+                    <div class="bg-slate-800/80 p-2.5 rounded border border-slate-700">
+                        <div class="text-[11px] text-slate-400 mb-1">Waiting (Xếp hàng)</div>
+                        <div class="text-xl font-extrabold text-rose-400" id="d5-waiting-threads">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <button onclick="runSlowQuery()" id="btn-slow-query" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-hourglass-start"></i> Bắn 1 Slow Query (ngủ 2s)
+                </button>
+                <button onclick="runStressTest()" id="btn-stress-test" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold py-2.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-burst"></i> Bắn Stress Test (15 luồng đồng thời)
+                </button>
+            </div>
+
+            <!-- Stress test results -->
+            <div id="day5-results" class="hidden bg-slate-900/90 border border-slate-700 rounded-lg p-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-simple text-orange-400"></i> Chi Tiết 15 Luồng Chạy:
+                    </span>
+                    <span id="d5-total-time" class="text-xs font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/30">-- ms</span>
+                </div>
+                <div id="d5-thread-chips" class="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                    <!-- Dynamic chips generated via JS -->
+                </div>
+                <p id="d5-explanation" class="text-[11px] text-slate-400 bg-slate-800/80 p-2.5 rounded border border-slate-700 leading-relaxed"></p>
+            </div>
+        </div>
         <div class="mt-6 bg-black/50 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-400">
             <div class="text-slate-500 font-semibold mb-2 flex items-center justify-between">
                 <span><i class="fa-solid fa-terminal mr-1"></i> System Activity Log</span>
@@ -319,7 +386,7 @@
 
         async function fetchStatus() {
             try {
-                const res = await fetch('/api/lab1/status');
+                const res = await fetch('/api/lab1/day1/status');
                 const data = await res.json();
                 document.getElementById('db-status').innerText = `DB: ${data.totalRecordsInDatabase.toLocaleString()} records`;
                 document.getElementById('ram-status').innerText = `RAM: ${data.totalRecordsInMemory.toLocaleString()} records (${data.isPreloaded ? 'Đã nạp' : 'Chưa nạp'})`;
@@ -337,7 +404,7 @@
             log('Bắt đầu chèn 100,000 bản ghi bằng JDBC Batch...');
 
             try {
-                const res = await fetch('/api/lab1/seed?count=100000', { method: 'POST' });
+                const res = await fetch('/api/lab1/day1/seed?count=100000', { method: 'POST' });
                 const data = await res.json();
                 log(`Đã chèn thành công ${data.totalRecords.toLocaleString()} dòng trong ${data.seedingTimeMs} ms!`, 'success');
                 await fetchStatus();
@@ -356,7 +423,7 @@
             log('Pre-warm: Đang kéo dữ liệu từ DB vào RAM của Interim Worker...');
 
             try {
-                const res = await fetch('/api/lab1/prewarm', { method: 'POST' });
+                const res = await fetch('/api/lab1/day1/prewarm', { method: 'POST' });
                 const data = await res.json();
                 log(`Đã nạp ${data.count.toLocaleString()} records vào RAM trong ${data.durationMs} ms (tiêu tốn ~${data.memoryUsedMB.toFixed(2)} MB RAM)!`, 'success');
                 await fetchStatus();
@@ -375,7 +442,7 @@
             log('Bắt đầu chạy benchmark so sánh Naive DB Query vs Duolingo In-Memory...');
 
             try {
-                const res = await fetch('/api/lab1/benchmark');
+                const res = await fetch('/api/lab1/day1/benchmark');
                 const data = await res.json();
 
                 document.getElementById('result-box').classList.remove('hidden');
@@ -408,7 +475,7 @@
             log('[Ngày 2] Đang gọi JPA findAll() 100k dòng để đo Heap RAM...');
 
             try {
-                const res = await fetch('/api/lab1/experiment/jpa-memory');
+                const res = await fetch('/api/lab1/day2/experiment/jpa-memory');
                 const data = await res.json();
                 resBox.innerHTML = `<span class="text-rose-400 font-bold">${data.memoryConsumedMB}</span> trong <span class="text-white">${data.timeMs} ms</span>`;
                 log(`[JPA findAll] Ngốn ${data.memoryConsumedMB} RAM, mất ${data.timeMs} ms!`, 'warning');
@@ -429,7 +496,7 @@
             log('[Ngày 2] Đang gọi JDBC + Java 17 Record 100k dòng để đo Heap RAM...');
 
             try {
-                const res = await fetch('/api/lab1/experiment/jdbc-memory');
+                const res = await fetch('/api/lab1/day2/experiment/jdbc-memory');
                 const data = await res.json();
                 resBox.innerHTML = `<span class="text-emerald-400 font-bold">${data.memoryConsumedMB}</span> trong <span class="text-white">${data.timeMs} ms</span>`;
                 log(`[JDBC Record] Chỉ ngốn ${data.memoryConsumedMB} RAM, mất ${data.timeMs} ms!`, 'success');
@@ -450,7 +517,10 @@
             log('[Ngày 3] Đang gọi JPA saveAll() chèn 2,000 bản ghi đơn lẻ...');
 
             try {
-                const res = await fetch('/api/lab1/experiment/batch-jpa?count=2000', { method: 'POST' });
+                const res = await fetch('/api/lab1/day3/experiment/batch-jpa?count=2000', { method: 'POST' });
+                if (!res.ok) {
+                    throw new Error(`Server trả về mã lỗi ${res.status}`);
+                }
                 const data = await res.json();
                 resBox.innerHTML = `<span class="text-rose-400 font-bold">${data.durationMs} ms</span> (~${data.opsPerSec.toLocaleString()} ops/s)`;
                 log(`[JPA saveAll] Chèn 2,000 dòng mất ${data.durationMs} ms!`, 'warning');
@@ -472,7 +542,10 @@
             log('[Ngày 3] Đang gọi JDBC batchUpdate() chèn 2,000 bản ghi trong 1 gói tin...');
 
             try {
-                const res = await fetch('/api/lab1/experiment/batch-jdbc?count=2000', { method: 'POST' });
+                const res = await fetch('/api/lab1/day3/experiment/batch-jdbc?count=2000', { method: 'POST' });
+                if (!res.ok) {
+                    throw new Error(`Server trả về mã lỗi ${res.status}`);
+                }
                 const data = await res.json();
                 resBox.innerHTML = `<span class="text-emerald-400 font-bold">${data.durationMs} ms</span> (~${data.opsPerSec.toLocaleString()} ops/s)`;
                 log(`[JDBC batchUpdate] Chèn 2,000 dòng chỉ mất ${data.durationMs} ms!`, 'success');
@@ -493,7 +566,7 @@
             log('[Ngày 4] Bắt đầu benchmark dung lượng RAM: ArrayList vs HashMap vs ConcurrentHashMap...');
 
             try {
-                const res = await fetch('/api/lab1/experiment/day4-datastructures');
+                const res = await fetch('/api/lab1/day4/datastructures');
                 const data = await res.json();
 
                 if (data.error) {
@@ -525,8 +598,92 @@
             }
         }
 
+        // ==================== DAY 5: HIKARICP FUNCTIONS ====================
+        async function fetchPoolStatus() {
+            try {
+                const res = await fetch('/api/lab1/day5/pool-status');
+                const data = await res.json();
+                document.getElementById('d5-active-conn').innerText = `${data.activeConnections} / ${data.totalConnections}`;
+                document.getElementById('d5-idle-conn').innerText = data.idleConnections;
+                document.getElementById('d5-waiting-threads').innerText = data.threadsAwaitingConnection;
+                return data;
+            } catch (e) {
+                console.error("Lỗi lấy pool status: ", e);
+            }
+        }
+
+        async function runSlowQuery() {
+            const btn = document.getElementById('btn-slow-query');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chạy query 2s...';
+            log('[Ngày 5] Bắn 1 Slow Query (SELECT pg_sleep(2)) giữ connection...');
+
+            const pollInterval = setInterval(fetchPoolStatus, 300);
+
+            try {
+                const res = await fetch('/api/lab1/day5/slow-query');
+                const data = await res.json();
+                log(`[Ngày 5] Slow Query hoàn tất sau ${data.durationMs}ms!`, 'success');
+            } catch (e) {
+                log('Lỗi Slow Query: ' + e.message, 'error');
+            } finally {
+                clearInterval(pollInterval);
+                await fetchPoolStatus();
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-hourglass-start"></i> Bắn 1 Slow Query (ngủ 2s)';
+            }
+        }
+
+        async function runStressTest() {
+            const btn = document.getElementById('btn-stress-test');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang stress-test 15 threads...';
+            log('[Ngày 5] Bắt đầu Stress Test 15 threads đồng thời vào Pool 10 connections...');
+
+            // Poll trạng thái liên tục mỗi 250ms để thấy pool bị nghẽn
+            const pollInterval = setInterval(fetchPoolStatus, 250);
+
+            try {
+                const res = await fetch('/api/lab1/day5/stress-test?requests=15');
+                const data = await res.json();
+
+                document.getElementById('day5-results').classList.remove('hidden');
+                document.getElementById('d5-total-time').innerText = `${data.overallDurationMs.toLocaleString()} ms`;
+                document.getElementById('d5-explanation').innerText = data.explanation;
+
+                // Render trực quan 15 threads
+                const chipsContainer = document.getElementById('d5-thread-chips');
+                chipsContainer.innerHTML = '';
+                data.threadResults.forEach(t => {
+                    const isQueued = t.durationMs > 2500;
+                    const chip = document.createElement('div');
+                    chip.className = `p-2 rounded text-center text-xs border ${
+                        isQueued 
+                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-300' 
+                            : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                    }`;
+                    chip.innerHTML = `
+                        <div class="font-bold">Thread #${t.threadId}</div>
+                        <div class="font-mono text-[11px]">${t.durationMs}ms</div>
+                        <div class="text-[9px] opacity-80">${isQueued ? 'Chờ đợt 2' : 'Xong đợt 1'}</div>
+                    `;
+                    chipsContainer.appendChild(chip);
+                });
+
+                log(`[Ngày 5] Stress Test hoàn tất trong ${data.overallDurationMs}ms (5 threads phải đợi đợt 2)!`, 'warning');
+            } catch (e) {
+                log('Lỗi Stress Test: ' + e.message, 'error');
+            } finally {
+                clearInterval(pollInterval);
+                await fetchPoolStatus();
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-burst"></i> Bắn Stress Test (15 luồng đồng thời)';
+            }
+        }
+
         // Tự động kiểm tra trạng thái khi tải trang
         fetchStatus();
+        fetchPoolStatus();
     </script>
 </body>
 </html>
