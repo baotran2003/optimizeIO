@@ -1,12 +1,12 @@
 # 🚀 optimizeIO — High-Throughput Notification System Benchmark
 
-> Mô phỏng và đo đạc kiến trúc gửi 4 triệu Push Notification trong 5 giây
+> Mô phỏng và đo đạc kiến trúc gửi 300k Push Notification trong 5 giây
 > đơn giản để chạy trên máy cá nhân.
 
 ## 📖 Bối cảnh bài toán
 
-gửi Push Notification tới **200k người dùng trong 5 giây(40,000noti/s)**
-3 bài toán (Tốc độ, Scale, Thời gian)]
+gửi Push Notification tới **300k người dùng trong 5 giây(60,000noti/s)**
+(Tốc độ, Scale, Thời gian)]
 
 ## 🏗️ Kiến trúc Lab 1: Zero DB Query At Peak
 
