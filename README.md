@@ -5,7 +5,7 @@
 
 ## 📖 Bối cảnh bài toán
 
-gửi Push Notification tới **4 triệu người dùng trong 5 giây(800,000noti/s)**
+gửi Push Notification tới **200k người dùng trong 5 giây(40,000noti/s)**
 3 bài toán (Tốc độ, Scale, Thời gian)]
 
 ## 🏗️ Kiến trúc Lab 1: Zero DB Query At Peak
