@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 Lab 2 — Chiếc Nút Đỏ Duolingo</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 32px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #1a1d27;
+            border-radius: 14px;
+            padding: 24px;
+            border: 1px solid #2a2d3a;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 99px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .badge-red    { background: #3d1515; color: #ff6b6b; border: 1px solid #ff6b6b44; }
+        .badge-blue   { background: #0d2a3d; color: #4fc3f7; border: 1px solid #4fc3f744; }
+        .badge-green  { background: #0d2d1a; color: #69f0ae; border: 1px solid #69f0ae44; }
+
+        .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; }
+        .card-desc  { font-size: 0.82rem; color: #888; line-height: 1.6; }
+
+        label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 4px; }
+
+        .controls { display: flex; gap: 10px; align-items: flex-end; }
+        .input-wrap { flex: 1; }
+
+        input[type=number] {
+            width: 100%;
+            background: #252836;
+            border: 1px solid #363a4f;
+            color: #fff;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type=number]:focus { border-color: #7c6ff7; }
+
+        button {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            white-space: nowrap;
+        }
+        button:hover   { opacity: 0.85; }
+        button:active  { transform: scale(0.97); }
+        button:disabled{ opacity: 0.4; cursor: not-allowed; }
+
+        .btn-red   { background: #e53935; color: #fff; }
+        .btn-blue  { background: #0288d1; color: #fff; }
+        .btn-green { background: #00897b; color: #fff; }
+
+        .result-box {
+            background: #11131d;
+            border: 1px solid #2a2d3a;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 0.78rem;
+            min-height: 80px;
+            line-height: 1.8;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .verdict-ok  { color: #69f0ae; font-weight: bold; }
+        .verdict-err { color: #ff6b6b; font-weight: bold; }
+        .verdict-loading { color: #ffd54f; }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+        .metric {
+            background: #252836;
+            border-radius: 8px;
+            padding: 10px 12px;
+            text-align: center;
+        }
+        .metric-value { font-size: 1.4rem; font-weight: 800; }
+        .metric-label { font-size: 0.68rem; color: #888; margin-top: 2px; }
+        .metric-green { color: #69f0ae; }
+        .metric-red   { color: #ff6b6b; }
+        .metric-blue  { color: #4fc3f7; }
+
+        .tag-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .tag {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #252836;
+            color: #aaa;
+        }
+
+        hr { border: none; border-top: 1px solid #2a2d3a; }
+
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid #555;
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<h1>🔴 Lab 2 — Chiếc Nút Đỏ Duolingo</h1>
+<p class="subtitle">So sánh trực tiếp 3 cơ chế chống Race Condition: Naive → CAS In-Memory → DB Unique Constraint</p>
+
+<div class="grid">
+
+    <!-- ===== DAY 1: Race Condition ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge badge-red">Ngày 1</span>
+            <span class="card-title">Race Condition (Check-Then-Act)</span>
+        </div>
+        <p class="card-desc">
+            Giả lập N người đồng thời bấm nút kích hoạt chiến dịch.
+            Code dùng <code>HashSet.contains()</code> rồi <code>.add()</code> — KHÔNG atomic.
+            Kết quả: chiến dịch bị kích hoạt nhiều hơn 1 lần! ❌
+        </p>
+        <div class="tag-row">
+            <span class="tag">HashSet (non thread-safe)</span>
+            <span class="tag">CountDownLatch</span>
+            <span class="tag">ExecutorService</span>
+        </div>
+        <hr>
+        <div class="controls">
+            <div class="input-wrap">
+                <label>Số người bấm đồng thời</label>
+                <input type="number" id="day1-users" value="60" min="1" max="200">
+            </div>
+            <button class="btn-red" onclick="runTest('day1')">🔴 Bắn!</button>
+        </div>
+        <div id="day1-metrics" class="metrics" style="display:none">
+            <div class="metric">
+                <div class="metric-value metric-red" id="day1-success">—</div>
+                <div class="metric-label">Lần kích hoạt</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value metric-blue" id="day1-rejected">—</div>
+                <div class="metric-label">Bị reject</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="day1-bug" style="font-size:1.6rem">—</div>
+                <div class="metric-label">Bug detected</div>
+            </div>
+        </div>
+        <div class="result-box" id="day1-result">Nhấn "Bắn!" để chạy test...</div>
+    </div>
+
+    <!-- ===== DAY 2: CAS In-Memory ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge badge-blue">Ngày 2</span>
+            <span class="card-title">In-Memory CAS (AtomicBoolean)</span>
+        </div>
+        <p class="card-desc">
+            Thay bằng <code>AtomicBoolean.compareAndSet(false, true)</code> —
+            lệnh nguyên tử cấp độ CPU (CMPXCHG). Chỉ 1 Winner duy nhất,
+            các luồng còn lại bị reject trong &lt; 0.01ms! ⚡
+        </p>
+        <div class="tag-row">
+            <span class="tag">AtomicBoolean</span>
+            <span class="tag">CAS / CMPXCHG</span>
+            <span class="tag">Non-blocking Lock-Free</span>
+        </div>
+        <hr>
+        <div class="controls">
+            <div class="input-wrap">
+                <label>Số người bấm đồng thời</label>
+                <input type="number" id="day2-users" value="60" min="1" max="200">
+            </div>
+            <button class="btn-blue" onclick="runTest('day2')">⚡ Bắn!</button>
+        </div>
+        <div id="day2-metrics" class="metrics" style="display:none">
+            <div class="metric">
+                <div class="metric-value metric-green" id="day2-success">—</div>
+                <div class="metric-label">Winner</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value metric-blue" id="day2-rejected">—</div>
+                <div class="metric-label">Bị reject</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value metric-green" id="day2-ns">—</div>
+                <div class="metric-label">Avg reject (ns)</div>
+            </div>
+        </div>
+        <div class="result-box" id="day2-result">Nhấn "Bắn!" để chạy test...</div>
+    </div>
+
+    <!-- ===== DAY 3: DB Unique Constraint ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge badge-green">Ngày 3</span>
+            <span class="card-title">DB Unique Constraint</span>
+        </div>
+        <p class="card-desc">
+            Chốt chặn tại tầng PostgreSQL bằng <code>UNIQUE(campaign_code)</code>.
+            Dù hệ thống chạy multi-node, DB là Single Source of Truth,
+            đảm bảo chỉ 1 bản ghi được INSERT thành công! 🛡️
+        </p>
+        <div class="tag-row">
+            <span class="tag">UNIQUE INDEX (B-Tree)</span>
+            <span class="tag">DataIntegrityViolationException</span>
+            <span class="tag">PostgreSQL 23505</span>
+        </div>
+        <hr>
+        <div class="controls">
+            <div class="input-wrap">
+                <label>Số người bấm đồng thời</label>
+                <input type="number" id="day3-users" value="50" min="1" max="200">
+            </div>
+            <button class="btn-green" onclick="runTest('day3')">🛡️ Bắn!</button>
+        </div>
+        <div id="day3-metrics" class="metrics" style="display:none">
+            <div class="metric">
+                <div class="metric-value metric-green" id="day3-success">—</div>
+                <div class="metric-label">Winner</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value metric-blue" id="day3-rejected">—</div>
+                <div class="metric-label">Bị reject</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value metric-green" id="day3-db">—</div>
+                <div class="metric-label">Records in DB</div>
+            </div>
+        </div>
+        <div class="result-box" id="day3-result">Nhấn "Bắn!" để chạy test...</div>
+    </div>
+
+</div>
+
+<script>
+    const config = {
+        day1: {
+            url: (n) => `/api/lab2/day1/race-condition?users=${n}`,
+            inputId: 'day1-users',
+            resultId: 'day1-result',
+            metricsId: 'day1-metrics',
+            renderMetrics: (data) => {
+                document.getElementById('day1-success').textContent  = data.successCount ?? '—';
+                document.getElementById('day1-rejected').textContent = data.rejectedCount ?? '—';
+                document.getElementById('day1-bug').textContent      = data.bugDetected ? '❌ YES' : '✅ NO';
+            },
+            verdict: (data) => data.verdict
+        },
+        day2: {
+            url: (n) => `/api/lab2/day2/in-memory-cas?users=${n}`,
+            inputId: 'day2-users',
+            resultId: 'day2-result',
+            metricsId: 'day2-metrics',
+            renderMetrics: (data) => {
+                document.getElementById('day2-success').textContent  = data.successCount ?? '—';
+                document.getElementById('day2-rejected').textContent = data.rejectedCount ?? '—';
+                document.getElementById('day2-ns').textContent       = data.avgRejectionNs != null ? data.avgRejectionNs + ' ns' : '—';
+            },
+            verdict: (data) => data.verdict
+        },
+        day3: {
+            url: (n) => `/api/lab2/day3/db-unique-constraint?users=${n}`,
+            inputId: 'day3-users',
+            resultId: 'day3-result',
+            metricsId: 'day3-metrics',
+            renderMetrics: (data) => {
+                document.getElementById('day3-success').textContent  = data.successCount ?? '—';
+                document.getElementById('day3-rejected').textContent = data.rejectedCount ?? '—';
+                document.getElementById('day3-db').textContent       = data.actualRecordsInDb ?? '—';
+            },
+            verdict: (data) => data.verdict
+        }
+    };
+
+    async function runTest(day) {
+        const cfg        = config[day];
+        const users      = document.getElementById(cfg.inputId).value;
+        const resultBox  = document.getElementById(cfg.resultId);
+        const metricsEl  = document.getElementById(cfg.metricsId);
+        const btn        = resultBox.closest('.card').querySelector('button');
+
+        btn.disabled = true;
+        resultBox.innerHTML = `<span class="spinner"></span><span class="verdict-loading">Đang bắn ${users} request đồng thời... ⏳</span>`;
+        metricsEl.style.display = 'none';
+
+        try {
+            const res  = await fetch(cfg.url(users));
+            const data = await res.json();
+
+            metricsEl.style.display = 'grid';
+            cfg.renderMetrics(data);
+
+            const verdict  = cfg.verdict(data) || '';
+            const isOk     = verdict.startsWith('✅');
+            const verdictClass = isOk ? 'verdict-ok' : 'verdict-err';
+
+            // Build pretty output (without executionLog clutter)
+            const display = { ...data };
+            delete display.executionLog;
+            const pretty = JSON.stringify(display, null, 2);
+
+            const log = (data.executionLog || []).map(l => `  • ${l}`).join('\n');
+
+            resultBox.innerHTML =
+                `<span class="${verdictClass}">${verdict}</span>\n\n` +
+                pretty +
+                (log ? `\n\n📋 Execution Log:\n${log}` : '');
+
+        } catch (e) {
+            resultBox.innerHTML = `<span class="verdict-err">❌ Lỗi kết nối: ${e.message}</span>\n\nKiểm tra Spring Boot đang chạy tại localhost:8080`;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
